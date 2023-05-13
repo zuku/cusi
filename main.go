@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"go.bug.st/serial"
 )
@@ -104,6 +105,10 @@ func main() {
 			if err := upload(port, args); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 			}
+		case "get":
+			if err := download(port, args); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+			}
 		case "help":
 			showSubCommandHelp()
 		case "exit":
@@ -137,6 +142,9 @@ func showSubCommandHelp() {
 
 	fmt.Println("put src dst")
 	fmt.Println("  upload local file to device")
+
+	fmt.Println("get REMOTE [LOCAL]")
+	fmt.Println("  download remote file to local")
 
 	fmt.Println("exit")
 	fmt.Println("  exit application")
@@ -345,5 +353,45 @@ func upload(port serial.Port, args []string) error {
 		fmt.Printf("\r%d / %d bytes", uploaded, info.Size())
 	}
 	fmt.Println()
+	return nil
+}
+
+func download(port serial.Port, args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("REMOTE path is required")
+	}
+	remotePath, err := normalizePath(args[0])
+	if err != nil {
+		return err
+	}
+	var outputIO *os.File
+	displayFile := true
+	if len(args) >= 2 {
+		localPath := args[1]
+		_, err := os.Stat(localPath)
+		if err == nil {
+			return fmt.Errorf("file already exists: %v", localPath)
+		}
+		outputIO, err = os.Create(localPath)
+		if err != nil {
+			return fmt.Errorf("failed to open local file: %w", err)
+		}
+		defer outputIO.Close()
+		displayFile = false
+	} else {
+		outputIO = os.Stdout
+	}
+	result, err := writeAndRead(port, createCommand(COMMAND_DOWNLOAD, remotePath))
+	if err != nil {
+		return fmt.Errorf("failed to download: %w", err)
+	}
+	if displayFile && !utf8.Valid(result) {
+		return fmt.Errorf("file contains binary data")
+	}
+	outputIO.Write(result)
+	if !displayFile {
+		fmt.Printf("%d bytes", len(result))
+		fmt.Println()
+	}
 	return nil
 }
