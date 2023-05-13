@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"syscall"
 	"time"
@@ -24,7 +26,14 @@ const (
 	EXIT_OPEN_ERROR      = 3
 	EXIT_SIGINT          = 0
 
-	SERIAL_READ_TIMEOUT = "15s"
+	SERIAL_READ_TIMEOUT = "3s"
+
+	COMMAND_LIST_DIR = 0x03
+	COMMAND_DOWNLOAD = 0x05
+	COMMAND_UPLOAD   = 0x06
+	COMMAND_REMOVE   = 0x07
+
+	BASE_DIR = "/flash"
 )
 
 func main() {
@@ -81,10 +90,14 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			continue
 		}
-		command, _ := parseCommandLine(line)
+		command, args := parseCommandLine(line)
 		switch command {
 		case "":
 			// ignore
+		case "ls":
+			if err := listDir(port, args); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+			}
 		case "help":
 			showSubCommandHelp()
 		case "exit":
@@ -112,6 +125,9 @@ func showHelp(out io.Writer) {
 func showSubCommandHelp() {
 	fmt.Println("help")
 	fmt.Println("  display this help")
+
+	fmt.Println("ls [PATH]")
+	fmt.Println("  list directory")
 
 	fmt.Println("exit")
 	fmt.Println("  exit interactive mode")
@@ -155,4 +171,104 @@ func parseCommandLine(line string) (string, []string) {
 		return parts[0], []string{}
 	}
 	return parts[0], parts[1:]
+}
+
+func writeAndRead(port serial.Port, b []byte) ([]byte, error) {
+	b = appendCrc(b)
+	if _, err := port.Write(b); err != nil {
+		return nil, err
+	}
+	buff := make([]byte, 256)
+	result := make([]byte, 0, 512)
+	for {
+		n, err := port.Read(buff)
+		if err != nil {
+			return nil, err
+		}
+		if n == 0 {
+			break
+		}
+		result = append(result, buff[:n]...)
+	}
+	if !verifyReceivedContainer(result) {
+		return nil, fmt.Errorf("invalid response")
+	}
+	data, err := extractReceivedData(result)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func createCommand(command int8, data string) []byte {
+	buff := make([]byte, 1, 64)
+	buff[0] = byte(command)
+	buff = append(buff, data...)
+	return buff
+}
+
+func verifyReceivedContainer(data []byte) bool {
+	head := [...]byte{0xaa, 0xab, 0xaa}
+	foot := [...]byte{0xab, 0xcc, 0xab}
+	return reflect.DeepEqual(data[0:3], head[:]) && reflect.DeepEqual(data[len(data)-3:], foot[:])
+}
+
+func extractReceivedData(data []byte) ([]byte, error) {
+	if len(data) < 6 {
+		return nil, fmt.Errorf("invalid data received")
+	}
+	content := data[5 : len(data)-5]
+	if data[4] != byte(0x00) {
+		return nil, fmt.Errorf("error: %v", string(content))
+	}
+	return content, nil
+}
+
+func crc16(data []byte) uint16 {
+	// Modbus
+	crc := uint16(0xffff)
+	for i := 0; i < len(data); i++ {
+		crc ^= uint16(data[i])
+		for j := 0; j < 8; j++ {
+			f := crc & 1
+			crc >>= 1
+			if f > 0 {
+				crc ^= 0xa001
+			}
+		}
+	}
+	return crc
+}
+
+func appendCrc(data []byte) []byte {
+	crc := crc16(data)
+	return append(data, byte(crc>>8), byte(crc&0x00ff))
+}
+
+func listDir(port serial.Port, args []string) error {
+	if len(args) > 1 {
+		return fmt.Errorf("too many arguments")
+	}
+	var path string
+	if len(args) == 0 {
+		path = BASE_DIR
+	} else {
+		if strings.HasPrefix(args[0], "/") {
+			return fmt.Errorf("absolute path is not permitted: %v", args[0])
+		}
+		path = filepath.Clean(BASE_DIR + "/" + args[0])
+		if !strings.HasPrefix(path, BASE_DIR) {
+			return fmt.Errorf("forbidden path: %v", path)
+		}
+	}
+	result, err := writeAndRead(port, createCommand(COMMAND_LIST_DIR, path))
+	if err != nil {
+		return err
+	}
+	for _, e := range strings.Split(string(result), ",") {
+		if len(e) > 0 {
+			fmt.Println(e)
+		}
+	}
+	return nil
 }
