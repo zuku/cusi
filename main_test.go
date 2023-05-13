@@ -2,6 +2,7 @@ package main
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -173,4 +174,63 @@ func TestAppendCrc(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNormalizePath(t *testing.T) {
+	type args struct {
+		path string
+	}
+	type results struct {
+		path      string
+		errortext string
+	}
+	tests := []struct {
+		name string
+		args args
+		want results
+	}{
+		{
+			name: "normal",
+			args: args{path: "path"},
+			want: results{path: "/flash/path", errortext: ""},
+		},
+		{
+			name: "root",
+			args: args{path: "/"},
+			want: results{path: "", errortext: "absolute path is not permitted"},
+		},
+		{
+			name: "absolute",
+			args: args{path: "/root"},
+			want: results{path: "", errortext: "absolute path is not permitted"},
+		},
+		{
+			name: "parent",
+			args: args{path: "../"},
+			want: results{path: "", errortext: "forbidden path"},
+		},
+		{
+			name: "complex",
+			args: args{path: "./path/./to/../../other/"},
+			want: results{path: "/flash/other", errortext: ""},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := normalizePath(tt.args.path)
+			if len(tt.want.errortext) > 0 {
+				if !strings.Contains(err.Error(), tt.want.errortext) {
+					t.Errorf("normalizePath err = %v, want %v", err, tt.want.errortext)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("normalizePath err = %v, want nil", err)
+				}
+				if got != tt.want.path {
+					t.Errorf("normalizePath path = %v, want %v", got, tt.want.path)
+				}
+			}
+		})
+	}
+
 }

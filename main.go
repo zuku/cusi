@@ -26,7 +26,7 @@ const (
 	EXIT_OPEN_ERROR      = 3
 	EXIT_SIGINT          = 0
 
-	SERIAL_READ_TIMEOUT = "3s"
+	SERIAL_READ_TIMEOUT = "500ms"
 
 	COMMAND_LIST_DIR = 0x03
 	COMMAND_DOWNLOAD = 0x05
@@ -34,6 +34,8 @@ const (
 	COMMAND_REMOVE   = 0x07
 
 	BASE_DIR = "/flash"
+
+	MAX_CHUNK_SIZE = 256 // 2**8
 )
 
 func main() {
@@ -98,6 +100,10 @@ func main() {
 			if err := listDir(port, args); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 			}
+		case "put":
+			if err := upload(port, args); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+			}
 		case "help":
 			showSubCommandHelp()
 		case "exit":
@@ -129,8 +135,11 @@ func showSubCommandHelp() {
 	fmt.Println("ls [PATH]")
 	fmt.Println("  list directory")
 
+	fmt.Println("put src dst")
+	fmt.Println("  upload local file to device")
+
 	fmt.Println("exit")
-	fmt.Println("  exit interactive mode")
+	fmt.Println("  exit application")
 }
 
 func showPorts() error {
@@ -245,6 +254,17 @@ func appendCrc(data []byte) []byte {
 	return append(data, byte(crc>>8), byte(crc&0x00ff))
 }
 
+func normalizePath(path string) (string, error) {
+	if strings.HasPrefix(path, "/") {
+		return "", fmt.Errorf("absolute path is not permitted: %v", path)
+	}
+	ret := filepath.Clean(BASE_DIR + "/" + path)
+	if !strings.HasPrefix(ret, BASE_DIR) {
+		return "", fmt.Errorf("forbidden path: %v", path)
+	}
+	return ret, nil
+}
+
 func listDir(port serial.Port, args []string) error {
 	if len(args) > 1 {
 		return fmt.Errorf("too many arguments")
@@ -253,12 +273,10 @@ func listDir(port serial.Port, args []string) error {
 	if len(args) == 0 {
 		path = BASE_DIR
 	} else {
-		if strings.HasPrefix(args[0], "/") {
-			return fmt.Errorf("absolute path is not permitted: %v", args[0])
-		}
-		path = filepath.Clean(BASE_DIR + "/" + args[0])
-		if !strings.HasPrefix(path, BASE_DIR) {
-			return fmt.Errorf("forbidden path: %v", path)
+		var err error
+		path, err = normalizePath(args[0])
+		if err != nil {
+			return nil
 		}
 	}
 	result, err := writeAndRead(port, createCommand(COMMAND_LIST_DIR, path))
@@ -270,5 +288,62 @@ func listDir(port serial.Port, args []string) error {
 			fmt.Println(e)
 		}
 	}
+	return nil
+}
+
+func upload(port serial.Port, args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("src and dst path arguments are required")
+	}
+	src := args[0]
+	dst, err := normalizePath(args[1])
+	if err != nil {
+		return err
+	}
+	fp, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open src file: %w", err)
+	}
+	defer fp.Close()
+	info, err := fp.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat src file: %w", err)
+	}
+	fmt.Println("Uploading...")
+	buff := make([]byte, MAX_CHUNK_SIZE)
+	first := true
+	uploaded := 0
+	for {
+		n, err := fp.Read(buff)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return fmt.Errorf("failed to read src file: %w", err)
+		}
+		if n == 0 {
+			break
+		}
+		data := make([]byte, 0, 300)
+		data = append(data, createCommand(COMMAND_UPLOAD, dst)...)
+		data = append(data, byte(0x00))
+		if !first {
+			data = append(data, byte(0x00))
+		} else {
+			data = append(data, byte(0x01))
+			first = false
+		}
+		data = append(data, buff[:n]...)
+		result, err := writeAndRead(port, data)
+		if err != nil {
+			return fmt.Errorf("failed to upload: %w", err)
+		}
+		if !strings.Contains(string(result), "done") {
+			return fmt.Errorf("unexpected result")
+		}
+		uploaded += n
+		fmt.Printf("\r%d / %d bytes", uploaded, info.Size())
+	}
+	fmt.Println()
 	return nil
 }
