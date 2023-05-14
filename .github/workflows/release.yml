@@ -1,0 +1,65 @@
+name: Build and Release
+
+on:
+    push:
+        tags:
+            - "v*.*.*"
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/checkout@v3
+            - uses: actions/setup-go@v4
+              with:
+                go-version: '1.20'
+            - name: Compare version with tag
+              run: |
+                 CUSIVERSION=`go run main.go -v | cut -d " " -f 2`
+                 echo "Version: ${CUSIVERSION}"
+                 echo "Tag: ${{ github.ref_name }}"
+                 test "v${CUSIVERSION}" = "${{ github.ref_name }}"
+            - name: Create tmp dir
+              run: mkdir build/tmp
+            - name: Build for darwin/amd64
+              env:
+                GOOS: darwin
+                GOARCH: amd64
+              run: |
+                mkdir build/tmp/${GOOS}_${GOARCH}
+                go build -o build/tmp/${GOOS}_${GOARCH}/cusi main.go
+            - name: Build for darwin/arm64
+              env:
+                GOOS: darwin
+                GOARCH: arm64
+              run: |
+                mkdir build/tmp/${GOOS}_${GOARCH}
+                go build -o build/tmp/${GOOS}_${GOARCH}/cusi main.go
+            - name: Build for linux/amd64
+              env:
+                GOOS: linux
+                GOARCH: amd64
+              run: |
+                mkdir build/tmp/${GOOS}_${GOARCH}
+                go build -o build/tmp/${GOOS}_${GOARCH}/cusi main.go
+            - name: Build for windows/amd64
+              env:
+                GOOS: windows
+                GOARCH: amd64
+              run: |
+                mkdir build/tmp/${GOOS}_${GOARCH}
+                go build -o build/tmp/${GOOS}_${GOARCH}/cusi.exe main.go
+            - name: Copy text files
+              run: |
+                cp LICENSE build/tmp/
+                cp THIRD-PARTY-NOTICES.txt build/tmp/
+            - name: Create archive file
+              working-directory: build/tmp
+              run: zip "../cusi-${{ github.ref_name }}.zip" -r *
+            - name: Release
+              uses: softprops/action-gh-release@v1
+              with:
+                files: "./build/cusi-${{ github.ref_name }}.zip"
+                prerelease: true
