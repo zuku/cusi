@@ -216,6 +216,9 @@ func writeAndRead(port serial.Port, b []byte) ([]byte, error) {
 		}
 		result = append(result, buff[:n]...)
 	}
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no response")
+	}
 	if !verifyReceivedContainer(result) {
 		return nil, fmt.Errorf("invalid response")
 	}
