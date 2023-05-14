@@ -135,7 +135,11 @@ func showVersion() {
 
 func showHelp(out io.Writer) {
 	flag.CommandLine.SetOutput(out)
-	fmt.Fprintln(out, "Usage: cusi [OPTION] [PORT]")
+	fmt.Fprintf(out, "%s is command line tools for M5Stack MicroPython system.", COMMAND)
+	fmt.Fprintln(out)
+	fmt.Fprintln(out)
+	fmt.Fprintf(out, "Usage: %s [OPTION] [PORT]", COMMAND)
+	fmt.Fprintln(out)
 	fmt.Fprintln(out)
 	flag.PrintDefaults()
 	fmt.Fprintln(out)
