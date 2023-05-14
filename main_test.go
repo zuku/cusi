@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -70,8 +71,8 @@ func TestExtractReceivedData(t *testing.T) {
 		data []byte
 	}
 	type results struct {
-		data    []byte
-		iserror bool
+		data      []byte
+		errortext string
 	}
 	tests := []struct {
 		name string
@@ -81,33 +82,33 @@ func TestExtractReceivedData(t *testing.T) {
 		{
 			name: "ok",
 			args: args{data: []byte{0xaa, 0xab, 0xaa, 0x00, 0x00, 0x61, 0x70, 0x70, 0x73, 0x2c, 0x00, 0x00, 0xab, 0xcc, 0xab}},
-			want: results{data: []byte{0x61, 0x70, 0x70, 0x73, 0x2c}, iserror: false},
+			want: results{data: []byte{0x61, 0x70, 0x70, 0x73, 0x2c}, errortext: ""},
 		},
 		{
 			name: "error_response",
 			args: args{data: []byte{0xaa, 0xab, 0xaa, 0x05, 0xff, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x00, 0x00, 0xab, 0xcc, 0xab}},
-			want: results{data: nil, iserror: true},
+			want: results{data: nil, errortext: "error"},
 		},
 		{
 			name: "short_response",
 			args: args{data: []byte{0xaa, 0xab, 0xaa, 0x00, 0x00}},
-			want: results{data: nil, iserror: true},
+			want: results{data: nil, errortext: "invalid data received"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := extractReceivedData(tt.args.data)
-			if tt.want.iserror {
-				if err == nil {
-					t.Errorf("extractReceivedData error is nil, error expected")
+			if len(tt.want.errortext) > 0 {
+				if !strings.Contains(err.Error(), tt.want.errortext) {
+					t.Errorf("extractReceivedData err = %v, want %v", err, tt.want.errortext)
 				}
 			} else {
 				if err != nil {
-					t.Errorf("extractReceivedData error is not nil, nil expected")
+					t.Errorf("extractReceivedData err = %v, want nil", err)
 				}
-			}
-			if !reflect.DeepEqual(got, tt.want.data) {
-				t.Errorf("extractReceivedData []byte = %v, want %v", got, tt.want.data)
+				if !reflect.DeepEqual(got, tt.want.data) {
+					t.Errorf("extractReceivedData []byte = %v, want %v", got, tt.want.data)
+				}
 			}
 		})
 	}
@@ -237,5 +238,85 @@ func TestNormalizePath(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestNormalizePathOnWindows(t *testing.T) {
+	if os.PathSeparator == '/' {
+		t.Skip("skip on path separator = '/' system")
+	}
+	type args struct {
+		path string
+	}
+	type results struct {
+		path      string
+		errortext string
+	}
+	tests := []struct {
+		name string
+		args args
+		want results
+	}{
+		{
+			name: "normal",
+			args: args{path: "path"},
+			want: results{path: "/flash/path", errortext: ""},
+		},
+		{
+			name: "normal_sub",
+			args: args{path: "path\\to\\file.go"},
+			want: results{path: "/flash/path/to/file.go", errortext: ""},
+		},
+		{
+			name: "root",
+			args: args{path: "/"},
+			want: results{path: "", errortext: "absolute path is not permitted"},
+		},
+		{
+			name: "root_windows",
+			args: args{path: "\\"},
+			want: results{path: "", errortext: "absolute path is not permitted"},
+		},
+		{
+			name: "absolute",
+			args: args{path: "/root"},
+			want: results{path: "", errortext: "absolute path is not permitted"},
+		},
+		{
+			name: "absolute_windows",
+			args: args{path: "\\root"},
+			want: results{path: "", errortext: "absolute path is not permitted"},
+		},
+		{
+			name: "parent",
+			args: args{path: "..\\"},
+			want: results{path: "", errortext: "forbidden path"},
+		},
+		{
+			name: "complex",
+			args: args{path: ".\\path\\.\\to\\..\\..\\other\\"},
+			want: results{path: "/flash/other", errortext: ""},
+		},
+		{
+			name: "mixed",
+			args: args{path: ".\\path/./to\\../..\\other\\"},
+			want: results{path: "/flash/other", errortext: ""},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := normalizePath(tt.args.path)
+			if len(tt.want.errortext) > 0 {
+				if !strings.Contains(err.Error(), tt.want.errortext) {
+					t.Errorf("normalizePath err = %v, want %v", err, tt.want.errortext)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("normalizePath err = %v, want nil", err)
+				}
+				if got != tt.want.path {
+					t.Errorf("normalizePath path = %v, want %v", got, tt.want.path)
+				}
+			}
+		})
+	}
 }
