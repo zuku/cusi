@@ -77,6 +77,7 @@ func main() {
 	}
 	defer port.Close()
 	fmt.Println("connected")
+	clearBuffer(port)
 	reader := bufio.NewReader(os.Stdin)
 	go func() {
 		// Ctrl+C
@@ -215,6 +216,9 @@ func writeAndRead(port serial.Port, b []byte) ([]byte, error) {
 		}
 		result = append(result, buff[:n]...)
 	}
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no response")
+	}
 	if !verifyReceivedContainer(result) {
 		return nil, fmt.Errorf("invalid response")
 	}
@@ -223,6 +227,16 @@ func writeAndRead(port serial.Port, b []byte) ([]byte, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+func clearBuffer(port serial.Port) {
+	buff := make([]byte, 128)
+	for {
+		n, _ := port.Read(buff)
+		if n == 0 {
+			break
+		}
+	}
 }
 
 func createCommand(command int8, data string) []byte {
