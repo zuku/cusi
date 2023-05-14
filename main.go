@@ -158,7 +158,7 @@ func showSubCommandHelp() {
 	fmt.Println("  remove remote file")
 
 	fmt.Println("exit")
-	fmt.Println("  exit application")
+	fmt.Println("  exit prompt")
 }
 
 func showPorts() error {
