@@ -94,6 +94,11 @@ func main() {
 		fmt.Print("> ")
 		line, err := reader.ReadString('\n')
 		if err != nil {
+			if err == io.EOF {
+				// Ctrl+D
+				fmt.Println()
+				continue
+			}
 			fmt.Fprintln(os.Stderr, err)
 			continue
 		}
