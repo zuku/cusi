@@ -200,6 +200,11 @@ func TestNormalizePath(t *testing.T) {
 			want: results{path: "", errortext: "absolute path is not permitted"},
 		},
 		{
+			name: "root_windows",
+			args: args{path: "\\"},
+			want: results{path: "", errortext: "absolute path is not permitted"},
+		},
+		{
 			name: "absolute",
 			args: args{path: "/root"},
 			want: results{path: "", errortext: "absolute path is not permitted"},
