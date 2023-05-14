@@ -110,6 +110,10 @@ func main() {
 			if err := download(port, args); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 			}
+		case "rm":
+			if err := remove(port, args); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+			}
 		case "help":
 			showSubCommandHelp()
 		case "exit":
@@ -146,6 +150,9 @@ func showSubCommandHelp() {
 
 	fmt.Println("get REMOTE [LOCAL]")
 	fmt.Println("  download remote file to local")
+
+	fmt.Println("rm PATH")
+	fmt.Println("  remove remote file")
 
 	fmt.Println("exit")
 	fmt.Println("  exit application")
@@ -396,6 +403,24 @@ func download(port serial.Port, args []string) error {
 	if !displayFile {
 		fmt.Printf("%d bytes", len(result))
 		fmt.Println()
+	}
+	return nil
+}
+
+func remove(port serial.Port, args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("PATH is required")
+	}
+	path, err := normalizePath(args[0])
+	if err != nil {
+		return err
+	}
+	result, err := writeAndRead(port, createCommand(COMMAND_REMOVE, path))
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(string(result), "ok") {
+		return fmt.Errorf("failed to remove file: %v", string(result))
 	}
 	return nil
 }
