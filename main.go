@@ -88,6 +88,8 @@ func main() {
 		fmt.Fprintln(os.Stderr)
 		os.Exit(EXIT_SIGINT)
 	}()
+	fmt.Println("Type \"help\" for help.")
+	fmt.Println("Type \"exit\" or Ctrl-C to exit.")
 	for {
 		fmt.Print("> ")
 		line, err := reader.ReadString('\n')
