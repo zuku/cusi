@@ -36,7 +36,8 @@ const (
 
 	BASE_DIR = "/flash"
 
-	MAX_CHUNK_SIZE = 256 // 2**8
+	MAX_CHUNK_SIZE  = 256 // 2**8
+	MAX_PATH_LENGTH = 39
 )
 
 func main() {
@@ -140,8 +141,8 @@ func showSubCommandHelp() {
 	fmt.Println("ls [PATH]")
 	fmt.Println("  list directory")
 
-	fmt.Println("put src dst")
-	fmt.Println("  upload local file to device")
+	fmt.Println("put LOCAL REMOTE")
+	fmt.Println("  upload local file to remote")
 
 	fmt.Println("get REMOTE [LOCAL]")
 	fmt.Println("  download remote file to local")
@@ -301,21 +302,24 @@ func listDir(port serial.Port, args []string) error {
 
 func upload(port serial.Port, args []string) error {
 	if len(args) != 2 {
-		return fmt.Errorf("src and dst path arguments are required")
+		return fmt.Errorf("LOCAL and REMOTE path arguments are required")
 	}
-	src := args[0]
-	dst, err := normalizePath(args[1])
+	localPath := args[0]
+	remotePath, err := normalizePath(args[1])
 	if err != nil {
 		return err
 	}
-	fp, err := os.Open(src)
+	if len(remotePath) > MAX_PATH_LENGTH {
+		return fmt.Errorf("REMOTE path [%v:%d] is too long (max: %d)", remotePath, len(remotePath), MAX_PATH_LENGTH)
+	}
+	fp, err := os.Open(localPath)
 	if err != nil {
-		return fmt.Errorf("failed to open src file: %w", err)
+		return fmt.Errorf("failed to open local file: %w", err)
 	}
 	defer fp.Close()
 	info, err := fp.Stat()
 	if err != nil {
-		return fmt.Errorf("failed to stat src file: %w", err)
+		return fmt.Errorf("failed to stat local file: %w", err)
 	}
 	fmt.Println("Uploading...")
 	buff := make([]byte, MAX_CHUNK_SIZE)
@@ -327,13 +331,13 @@ func upload(port serial.Port, args []string) error {
 			if err == io.EOF {
 				break
 			}
-			return fmt.Errorf("failed to read src file: %w", err)
+			return fmt.Errorf("failed to read local file: %w", err)
 		}
 		if n == 0 {
 			break
 		}
 		data := make([]byte, 0, 300)
-		data = append(data, createCommand(COMMAND_UPLOAD, dst)...)
+		data = append(data, createCommand(COMMAND_UPLOAD, remotePath)...)
 		data = append(data, byte(0x00))
 		if !first {
 			data = append(data, byte(0x00))
