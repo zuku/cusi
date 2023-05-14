@@ -27,7 +27,7 @@ const (
 	EXIT_OPEN_ERROR      = 3
 	EXIT_SIGINT          = 0
 
-	SERIAL_READ_TIMEOUT = "500ms"
+	SERIAL_READ_TIMEOUT = "200ms"
 
 	COMMAND_LIST_DIR = 0x03
 	COMMAND_DOWNLOAD = 0x05
@@ -88,6 +88,8 @@ func main() {
 		fmt.Fprintln(os.Stderr)
 		os.Exit(EXIT_SIGINT)
 	}()
+	fmt.Println("Type \"help\" for help.")
+	fmt.Println("Type \"exit\" or Ctrl-C to exit.")
 	for {
 		fmt.Print("> ")
 		line, err := reader.ReadString('\n')
@@ -133,7 +135,11 @@ func showVersion() {
 
 func showHelp(out io.Writer) {
 	flag.CommandLine.SetOutput(out)
-	fmt.Fprintln(out, "Usage: cusi [OPTION] [PORT]")
+	fmt.Fprintf(out, "%s is command line tools for M5Stack MicroPython system.", COMMAND)
+	fmt.Fprintln(out)
+	fmt.Fprintln(out)
+	fmt.Fprintf(out, "Usage: %s [OPTION] [PORT]", COMMAND)
+	fmt.Fprintln(out)
 	fmt.Fprintln(out)
 	flag.PrintDefaults()
 	fmt.Fprintln(out)
@@ -156,7 +162,7 @@ func showSubCommandHelp() {
 	fmt.Println("  remove remote file")
 
 	fmt.Println("exit")
-	fmt.Println("  exit application")
+	fmt.Println("  exit prompt")
 }
 
 func showPorts() error {
