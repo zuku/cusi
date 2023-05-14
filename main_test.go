@@ -70,8 +70,8 @@ func TestExtractReceivedData(t *testing.T) {
 		data []byte
 	}
 	type results struct {
-		data    []byte
-		iserror bool
+		data      []byte
+		errortext string
 	}
 	tests := []struct {
 		name string
@@ -81,33 +81,33 @@ func TestExtractReceivedData(t *testing.T) {
 		{
 			name: "ok",
 			args: args{data: []byte{0xaa, 0xab, 0xaa, 0x00, 0x00, 0x61, 0x70, 0x70, 0x73, 0x2c, 0x00, 0x00, 0xab, 0xcc, 0xab}},
-			want: results{data: []byte{0x61, 0x70, 0x70, 0x73, 0x2c}, iserror: false},
+			want: results{data: []byte{0x61, 0x70, 0x70, 0x73, 0x2c}, errortext: ""},
 		},
 		{
 			name: "error_response",
 			args: args{data: []byte{0xaa, 0xab, 0xaa, 0x05, 0xff, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x00, 0x00, 0xab, 0xcc, 0xab}},
-			want: results{data: nil, iserror: true},
+			want: results{data: nil, errortext: "error"},
 		},
 		{
 			name: "short_response",
 			args: args{data: []byte{0xaa, 0xab, 0xaa, 0x00, 0x00}},
-			want: results{data: nil, iserror: true},
+			want: results{data: nil, errortext: "invalid data received"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := extractReceivedData(tt.args.data)
-			if tt.want.iserror {
-				if err == nil {
-					t.Errorf("extractReceivedData error is nil, error expected")
+			if len(tt.want.errortext) > 0 {
+				if !strings.Contains(err.Error(), tt.want.errortext) {
+					t.Errorf("extractReceivedData err = %v, want %v", err, tt.want.errortext)
 				}
 			} else {
 				if err != nil {
-					t.Errorf("extractReceivedData error is not nil, nil expected")
+					t.Errorf("extractReceivedData err = %v, want nil", err)
 				}
-			}
-			if !reflect.DeepEqual(got, tt.want.data) {
-				t.Errorf("extractReceivedData []byte = %v, want %v", got, tt.want.data)
+				if !reflect.DeepEqual(got, tt.want.data) {
+					t.Errorf("extractReceivedData []byte = %v, want %v", got, tt.want.data)
+				}
 			}
 		})
 	}
