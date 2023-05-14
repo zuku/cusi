@@ -291,10 +291,10 @@ func appendCrc(data []byte) []byte {
 }
 
 func normalizePath(path string) (string, error) {
-	if strings.HasPrefix(path, "/") {
+	if strings.HasPrefix(path, "/") || strings.HasPrefix(path, "\\") {
 		return "", fmt.Errorf("absolute path is not permitted: %v", path)
 	}
-	ret := filepath.Clean(BASE_DIR + "/" + path)
+	ret := filepath.ToSlash(filepath.Clean(BASE_DIR + "/" + path))
 	if !strings.HasPrefix(ret, BASE_DIR) {
 		return "", fmt.Errorf("forbidden path: %v", path)
 	}
@@ -312,7 +312,7 @@ func listDir(port serial.Port, args []string) error {
 		var err error
 		path, err = normalizePath(args[0])
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 	result, err := writeAndRead(port, createCommand(COMMAND_LIST_DIR, path))
