@@ -16,13 +16,20 @@ jobs:
               with:
                 go-version: '1.20'
             - name: Compare version with tag
+              id: version
               run: |
                  CUSIVERSION=`go run main.go -v | cut -d " " -f 2`
                  echo "Version: ${CUSIVERSION}"
                  echo "Tag: ${{ github.ref_name }}"
+                 echo "CUSIVERSION=${CUSIVERSION}" >> $GITHUB_OUTPUT
                  test "v${CUSIVERSION}" = "${{ github.ref_name }}"
             - name: Create tmp dir
               run: mkdir build/tmp
+            - name: Create release note
+              run: |
+                echo "# Cusi ${{ steps.version.outputs.CUSIVERSION }}" > build/release-note.md
+                echo "Cusi version ${{ steps.version.outputs.CUSIVERSION }}" >> build/release-note.md
+                echo >> build/release-note.md
             - name: Build for darwin/amd64
               env:
                 GOOS: darwin
@@ -59,8 +66,16 @@ jobs:
             - name: Create archive file
               working-directory: build/tmp
               run: zip "../cusi-${{ github.ref_name }}.zip" -r *
+            - name: Compute checksum
+              run: |
+                echo "## Files" >> build/release-note.md
+                echo "|SHA-256|File|" >> build/release-note.md
+                echo "|-----|-----|" >> build/release-note.md
+                find build/tmp -type f -name "cusi*" | sort | sha256sum | sed -r 's/^([0-9a-f]+) +build\/tmp\/(.+)$/|`\1`|`\2`|/g' >> build/release-note.md
+                echo >> build/release-note.md
             - name: Release
               uses: softprops/action-gh-release@v1
               with:
                 files: "./build/cusi-${{ github.ref_name }}.zip"
+                body_path: "./build/release-note.md"
                 prerelease: true
