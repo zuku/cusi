@@ -53,6 +53,7 @@ jobs:
                 go build -o build/tmp/${GOOS}_${GOARCH}/cusi.exe main.go
             - name: Copy text files
               run: |
+                cp readme.txt build/tmp/
                 cp LICENSE build/tmp/
                 cp THIRD-PARTY-NOTICES.txt build/tmp/
             - name: Create archive file

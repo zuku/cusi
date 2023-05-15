@@ -19,7 +19,7 @@ import (
 
 const (
 	COMMAND = "cusi"
-	VERSION = "0.0.1"
+	VERSION = "0.0.2"
 
 	EXIT_OK              = 0
 	EXIT_LIST_PORT_ERROR = 1
