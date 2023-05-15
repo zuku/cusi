@@ -38,6 +38,8 @@ const (
 
 	MAX_CHUNK_SIZE  = 256 // 2**8
 	MAX_PATH_LENGTH = 39
+
+	MAX_READ_BRISKLY_COUNT = 5
 )
 
 func main() {
@@ -240,6 +242,38 @@ func writeAndRead(port serial.Port, b []byte) ([]byte, error) {
 	return data, nil
 }
 
+func writeAndReadBriskly(port serial.Port, b []byte, bufferSize int) ([]byte, error) {
+	b = appendCrc(b)
+	if _, err := port.Write(b); err != nil {
+		return nil, err
+	}
+	buff := make([]byte, bufferSize)
+	result := make([]byte, 0, bufferSize*2)
+	for i := 0; i < MAX_READ_BRISKLY_COUNT; i++ {
+		n, err := port.Read(buff)
+		if err != nil {
+			return nil, err
+		}
+		if n != 0 {
+			result = append(result, buff[:n]...)
+			if verifyReceivedContainer(result) {
+				break
+			}
+		}
+	}
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no response")
+	}
+	if !verifyReceivedContainer(result) {
+		return nil, fmt.Errorf("invalid response")
+	}
+	data, err := extractReceivedData(result)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
 func clearBuffer(port serial.Port) {
 	buff := make([]byte, 128)
 	for {
@@ -258,6 +292,14 @@ func createCommand(command int8, data string) []byte {
 }
 
 func verifyReceivedContainer(data []byte) bool {
+	/*
+	 * header(3)
+	 * command(1)
+	 * result(1) 0x00=ok probably
+	 * data(*)
+	 * crc16(2) crc16(head+command+result+data)
+	 * footer(3)
+	 */
 	head := [...]byte{0xaa, 0xab, 0xaa}
 	foot := [...]byte{0xab, 0xcc, 0xab}
 	return reflect.DeepEqual(data[0:3], head[:]) && reflect.DeepEqual(data[len(data)-3:], foot[:])
@@ -378,7 +420,8 @@ func upload(port serial.Port, args []string) error {
 			first = false
 		}
 		data = append(data, buff[:n]...)
-		result, err := writeAndRead(port, data)
+		// 3(head) + 2 + 4(done) + 2 + 3(foot) = 14
+		result, err := writeAndReadBriskly(port, data, 14)
 		if err != nil {
 			return fmt.Errorf("failed to upload: %w", err)
 		}
