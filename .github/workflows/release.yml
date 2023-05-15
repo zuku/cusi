@@ -78,4 +78,3 @@ jobs:
               with:
                 files: "./build/cusi-${{ github.ref_name }}.zip"
                 body_path: "./build/release-note.md"
-                prerelease: true
