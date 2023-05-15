@@ -71,7 +71,7 @@ jobs:
                 echo "## Files" >> build/release-note.md
                 echo "|SHA-256|File|" >> build/release-note.md
                 echo "|-----|-----|" >> build/release-note.md
-                find build/tmp -type f -name "cusi*" | sort | sha256sum | sed -r 's/^([0-9a-f]+) +build\/tmp\/(.+)$/|`\1`|`\2`|/g' >> build/release-note.md
+                find build/tmp -type f -name "cusi*" | sort | xargs sha256sum | sed -r 's/^([0-9a-f]+) +build\/tmp\/(.+)$/|`\1`|`\2`|/g' >> build/release-note.md
                 echo >> build/release-note.md
             - name: Release
               uses: softprops/action-gh-release@v1
