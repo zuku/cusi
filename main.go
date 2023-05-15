@@ -292,6 +292,14 @@ func createCommand(command int8, data string) []byte {
 }
 
 func verifyReceivedContainer(data []byte) bool {
+	/*
+	 * header(3)
+	 * command(1)
+	 * result(1) 0x00=ok probably
+	 * data(*)
+	 * crc16(2) crc16(head+command+result+data)
+	 * footer(3)
+	 */
 	head := [...]byte{0xaa, 0xab, 0xaa}
 	foot := [...]byte{0xab, 0xcc, 0xab}
 	return reflect.DeepEqual(data[0:3], head[:]) && reflect.DeepEqual(data[len(data)-3:], foot[:])
