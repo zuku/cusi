@@ -33,8 +33,9 @@ If you want to execute `cusi` command, follow the steps below.
 
 1. Show the command file in Finder.
 2. Control-click (or right-click) the command file, then choose _Open_ from the shortcut menu.
-3. Terminal.app opens and the command is executed, then close the window.
-4. Once the command has been executed, you can execute the command from your prefer terminal app.
+3. Click _Open_ button in the dialog box.
+4. Terminal.app opens and the command is executed, then close the window.
+5. Once the command has been executed, you can execute the command from your prefer terminal app.
 
 ## Usage
 
