@@ -40,6 +40,8 @@ If you want to execute `cusi` command, follow the steps below.
 
 ### Connect to the device
 
+First, set the M5Stack device to USB mode and connect it to your computer.
+
 #### macOS
 List available serial ports.
 
