@@ -1,4 +1,8 @@
 # Cusi
+
+* English
+* [日本語](README_ja.md)
+
 Cusi is command line tools for M5Stack MicroPython (UIFlow) system.
 This command provides the functionality to read/write files to and from M5Stack device.
 
